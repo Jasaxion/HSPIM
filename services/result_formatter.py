@@ -4,7 +4,24 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List
 
+try:
+    import markdown  # type: ignore
+except ImportError:  # pragma: no cover - fallback when dependency missing
+    markdown = None
+
 from i18n import translate
+
+
+def _render_markdown(text: str) -> str:
+    """Render markdown text to HTML with a graceful fallback."""
+
+    if not text:
+        return ""
+
+    if markdown is not None:
+        return markdown.markdown(text, extensions=["fenced_code", "tables"])
+
+    return text.replace("\n", "<br>")
 
 
 def build_section_html(evaluations: List[Dict[str, Any]], language: str) -> str:
@@ -13,7 +30,7 @@ def build_section_html(evaluations: List[Dict[str, Any]], language: str) -> str:
         scores = item.get("Scores", {})
         section_title = item.get("Section", "")
         answer_text = item.get("Answer", "") or ""
-        answer_html = answer_text.replace("\n", "<br>")
+        answer_html = _render_markdown(answer_text)
         parts.append("<div class='section-item'>")
         parts.append(
             "<h3>{header}: {title}</h3>".format(
