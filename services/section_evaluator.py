@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from typing import Any, Dict, List
 
 from config.PaperQGPrompt import (
@@ -130,11 +131,7 @@ class SectionEvaluator:
             ChatMessage(role="user", content=prompt),
         ]
         raw = await self._retry_chat(messages)
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            LOGGER.warning("Failed to parse JSON scores for section '%s'", section.heading)
-            parsed = {}
+        parsed = self._parse_score_payload(raw, section.heading)
         scores: Dict[str, Any] = {}
         for dim in DIMENSIONS:
             entry = parsed.get(dim, {}) if isinstance(parsed, dict) else {}
@@ -160,3 +157,34 @@ class SectionEvaluator:
                 await asyncio.sleep(delay)
                 delay *= 2
         raise LLMError("LLM request failed after retries")
+
+    def _parse_score_payload(self, raw: str, heading: str) -> Dict[str, Any]:
+        if not raw:
+            LOGGER.warning("Empty score response for section '%s'", heading)
+            return {}
+
+        text = raw.strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```[a-zA-Z0-9_-]*", "", text, count=1).strip()
+            if text.endswith("```"):
+                text = text[: -3].strip()
+
+        for candidate in (text, self._extract_json_object(text)):
+            if not candidate:
+                continue
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+
+        LOGGER.warning(
+            "Failed to parse JSON scores for section '%s'. Raw response: %s",
+            heading,
+            raw,
+        )
+        return {}
+
+    @staticmethod
+    def _extract_json_object(text: str) -> str:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        return match.group(0) if match else ""

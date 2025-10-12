@@ -4,12 +4,16 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from models.llm import BaseChatModel, ChatMessage, LLMError
 from utils.logger import get_logger
 
 LOGGER = get_logger(__name__)
+
+
+_ABSTRACT_PATTERN = re.compile(r"^(abstract|summary|摘[要]|概要)\b[:：\s\-–—]*", re.IGNORECASE)
+_INDEX_TERMS_PATTERN = re.compile(r"^(index\s+terms?|keywords?)\b", re.IGNORECASE)
 
 
 def _extract_references(text: str) -> List[str]:
@@ -22,6 +26,56 @@ def _extract_references(text: str) -> List[str]:
         if cleaned:
             references.append(cleaned)
     return references
+
+
+def _process_metadata(lines: List[str]) -> Tuple[str, str, str]:
+    """Extract authors, emails, and abstract text from metadata lines."""
+
+    authors_parts: List[str] = []
+    emails_parts: List[str] = []
+    abstract_lines: List[str] = []
+    abstract_mode = False
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if abstract_mode:
+            if _INDEX_TERMS_PATTERN.match(line):
+                abstract_mode = False
+            else:
+                abstract_lines.append(line)
+                continue
+
+        abstract_match = _ABSTRACT_PATTERN.match(line)
+        if abstract_match:
+            cleaned = line[abstract_match.end():].strip()
+            abstract_lines.append(cleaned or line)
+            abstract_mode = True
+            continue
+
+        if "@" in line:
+            emails_parts.append(line)
+            continue
+
+        authors_parts.append(line)
+
+    authors = " ".join(authors_parts).strip()
+    emails = " ".join(emails_parts).strip()
+    abstract = "\n".join(abstract_lines).strip()
+    return authors, emails, abstract
+
+
+def _ensure_abstract_section(
+    sections: List[PaperSection], abstract_text: str
+) -> None:
+    if not abstract_text:
+        return
+    for section in sections:
+        if "abstract" in section.heading.lower():
+            return
+    sections.insert(0, PaperSection("Abstract", abstract_text))
 
 
 @dataclass
@@ -114,9 +168,9 @@ class PaperDocument:
                     sections.append(PaperSection(current_heading, section_text))
 
         if metadata_buffer:
-            authors = metadata_buffer[0]
-            if len(metadata_buffer) > 1:
-                emails = metadata_buffer[1]
+            authors, emails, abstract_text = _process_metadata(metadata_buffer)
+            if abstract_text:
+                _ensure_abstract_section(sections, abstract_text)
 
         if not sections:
             fallback_text = markdown.strip()
@@ -172,9 +226,9 @@ class PaperDocument:
                     sections.append(PaperSection(current_heading, section_text))
 
         if metadata_buffer:
-            authors = metadata_buffer[0]
-            if len(metadata_buffer) > 1:
-                emails = metadata_buffer[1]
+            authors, emails, abstract_text = _process_metadata(metadata_buffer)
+            if abstract_text:
+                _ensure_abstract_section(sections, abstract_text)
 
         if not sections and segment_list:
             combined_text = "\n".join(
