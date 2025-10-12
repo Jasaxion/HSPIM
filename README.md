@@ -5,6 +5,8 @@ A Hierarchical Framework for Measuring Scientific Paper Innovation via Large Lan
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)]()
 
+[中文](https://github.com/Jasaxion/HSPIM/blob/main/README_CN.md)
+
 ## Overview
 
 This repository hosts a Gradio powered application that analyses the
@@ -17,8 +19,6 @@ innovation of academic papers following the methodology proposed in
    predefined taxonomy before targeted question answering.
 3. **Novelty Scoring** – multi dimensional (Novelty, Contribution,
    Feasibility) evaluation with confidence weighted aggregation.
-4. **Presentation** – a bilingual (English/中文) Gradio interface renders
-   detailed reasoning together with the final innovation score.
 
 ## Getting Started
 
@@ -44,17 +44,6 @@ whether to enable enhanced parsing, and trigger the analysis. Results are
 displayed section by section with detailed answers and weighted scores
 plus the final innovation rating.
 
-## Project Structure
-
-```
-config/           Configuration management and prompts
-models/           Model abstraction layer (OpenAI/local transformers)
-services/         MinerU wrapper, parsing, evaluation pipeline
-utils/            Logging helpers
-i18n/             Translation tables for the UI
-app.py            Gradio application entrypoint
-```
-
 ## Notes
 
 - MinerU API integration supports polling for remote extraction. When an
@@ -64,4 +53,8 @@ app.py            Gradio application entrypoint
   minimise token consumption.
 - Section evaluation runs concurrently (default 16 workers) to reduce
   latency when analysing long papers.
+
+## Future Work
+
+- Optimizing predefined Q&A prompts for papers across different domains within the HSPIM framework. (Currently using best predefine prompt)
 
