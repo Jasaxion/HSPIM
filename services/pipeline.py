@@ -71,7 +71,7 @@ async def analyse_paper(file_path: Path, use_enhanced: bool = False) -> Dict[str
         )
 
         try:
-            raw_json = mineru_client.parse(
+            mineru_output = mineru_client.parse(
                 file_path,
                 is_ocr=mineru_cfg.get("use_ocr", True),
                 enable_formula=mineru_cfg.get("enable_formula", False),
@@ -82,10 +82,22 @@ async def analyse_paper(file_path: Path, use_enhanced: bool = False) -> Dict[str
             LOGGER.exception("MinerU parsing failed")
             raise PipelineError(str(exc)) from exc
 
+        raw_payload = mineru_output.get("raw") if isinstance(mineru_output, dict) else None
+        markdown_payload = (
+            mineru_output.get("markdown") if isinstance(mineru_output, dict) else None
+        )
+        if raw_payload is None:
+            raise PipelineError("MinerU did not return a JSON payload")
+
         mineru_json_path = run_dir / "mineru_raw.json"
-        _write_json(mineru_json_path, raw_json)
+        _write_json(mineru_json_path, raw_payload)
         LOGGER.info("MinerU JSON stored at %s", mineru_json_path)
-        document = PaperDocument.from_json(raw_json)
+        if markdown_payload:
+            markdown_path = run_dir / "mineru_markdown.md"
+            markdown_path.write_text(markdown_payload, encoding="utf-8")
+            LOGGER.info("MinerU markdown stored at %s", markdown_path)
+
+        document = PaperDocument.from_mineru(raw_payload, markdown_payload)
         initial_doc_path = run_dir / "document_initial.json"
         _write_json(initial_doc_path, document.to_dict())
         LOGGER.debug("Initial document saved to %s", initial_doc_path)

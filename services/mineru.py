@@ -103,21 +103,37 @@ class MineruClient:
         return destination
 
     @staticmethod
-    def extract_json_from_zip(zip_path: Path, output_dir: Optional[Path] = None) -> Dict[str, Any]:
+    def extract_assets_from_zip(
+        self, zip_path: Path, output_dir: Optional[Path] = None
+    ) -> Dict[str, Any]:
         if output_dir is None:
             output_dir = zip_path.parent
+        raw_json: Optional[Any] = None
+        markdown: Optional[str] = None
         with zipfile.ZipFile(zip_path, "r") as archive:
             for member in archive.namelist():
-                if member.endswith(".json"):
-                    archive.extract(member, output_dir)
-                    json_path = output_dir / member
-                    with json_path.open("r", encoding="utf-8") as fp:
-                        return json.load(fp)
-        raise MineruError("JSON file not found in MinerU zip archive")
+                if member.endswith("/"):
+                    continue
+                archive.extract(member, output_dir)
+                target_path = output_dir / member
+                lower_name = member.lower()
+                if lower_name.endswith(".json"):
+                    with target_path.open("r", encoding="utf-8") as fp:
+                        try:
+                            raw_json = json.load(fp)
+                        except json.JSONDecodeError as exc:
+                            raise MineruError(
+                                f"Failed to decode MinerU JSON payload: {exc}"
+                            ) from exc
+                elif lower_name.endswith(".md"):
+                    markdown = target_path.read_text(encoding="utf-8")
+        if raw_json is None:
+            raise MineruError("JSON file not found in MinerU zip archive")
+        return {"raw": raw_json, "markdown": markdown}
 
     def parse_local_json(self, file_path: Path) -> Dict[str, Any]:
         with file_path.open("r", encoding="utf-8") as fp:
-            return json.load(fp)
+            return {"raw": json.load(fp), "markdown": None}
 
     def parse(self, file_path: Path, **options: Any) -> Dict[str, Any]:
         suffix = file_path.suffix.lower()
@@ -142,6 +158,7 @@ class MineruClient:
             "enable_formula": enable_formula,
             "enable_table": enable_table,
             "language": language,
+            "extra_formats": ["markdown"],
             "files": [
                 {
                     "name": file_path.name,
@@ -174,7 +191,7 @@ class MineruClient:
         if not zip_url:
             raise MineruError("MinerU did not return a zip result URL")
         zip_path = self.download_result(zip_url)
-        return self.extract_json_from_zip(zip_path)
+        return self.extract_assets_from_zip(zip_path)
 
     def _wait_batch_completion(self, batch_id: str, file_name: str, timeout: int = 900, poll_interval: int = 5) -> Dict[str, Any]:
         deadline = time.time() + timeout

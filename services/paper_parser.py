@@ -2,13 +2,26 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List, Optional
 
 from models.llm import BaseChatModel, ChatMessage, LLMError
 from utils.logger import get_logger
 
 LOGGER = get_logger(__name__)
+
+
+def _extract_references(text: str) -> List[str]:
+    references: List[str] = []
+    for line in text.splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        cleaned = re.sub(r"^[\-•\d\.)\s]+", "", cleaned)
+        if cleaned:
+            references.append(cleaned)
+    return references
 
 
 @dataclass
@@ -35,7 +48,7 @@ class PaperDocument:
             for section in payload.get("sections", [])
             if section
         ]
-        references = []
+        references: List[str] = []
         raw_refs = payload.get("references", [])
         if isinstance(raw_refs, list):
             references = [str(ref) for ref in raw_refs]
@@ -48,6 +61,147 @@ class PaperDocument:
             sections=sections,
             references=references,
         )
+
+    @classmethod
+    def from_markdown(cls, markdown: str) -> "PaperDocument":
+        lines = markdown.splitlines()
+        title = ""
+        authors = ""
+        emails = ""
+        sections: List[PaperSection] = []
+        references: List[str] = []
+
+        current_heading: Optional[str] = None
+        current_lines: List[str] = []
+        metadata_buffer: List[str] = []
+
+        heading_pattern = re.compile(r"^(#+)\s+(.*)")
+
+        for raw_line in lines:
+            line = raw_line.rstrip()
+            match = heading_pattern.match(line.strip())
+            if match:
+                level = len(match.group(1))
+                heading_text = match.group(2).strip()
+                if level <= 2 and not title:
+                    title = heading_text
+                    current_heading = None
+                    current_lines = []
+                    continue
+                if current_heading:
+                    section_text = "\n".join(current_lines).strip()
+                    if section_text:
+                        if "reference" in current_heading.lower():
+                            references = _extract_references(section_text)
+                        else:
+                            sections.append(PaperSection(current_heading, section_text))
+                current_heading = heading_text
+                current_lines = []
+                continue
+
+            if current_heading:
+                current_lines.append(line)
+            else:
+                if line.strip():
+                    metadata_buffer.append(line.strip())
+
+        if current_heading:
+            section_text = "\n".join(current_lines).strip()
+            if section_text:
+                if "reference" in current_heading.lower():
+                    references = _extract_references(section_text)
+                else:
+                    sections.append(PaperSection(current_heading, section_text))
+
+        if metadata_buffer:
+            authors = metadata_buffer[0]
+            if len(metadata_buffer) > 1:
+                emails = metadata_buffer[1]
+
+        if not sections:
+            fallback_text = markdown.strip()
+            if fallback_text:
+                sections = [PaperSection("Content", fallback_text)]
+
+        return cls(title=title, authors=authors, emails=emails, sections=sections, references=references)
+
+    @classmethod
+    def from_segments(cls, segments: Iterable[Dict[str, Any]]) -> "PaperDocument":
+        segment_list = [entry for entry in segments if isinstance(entry, dict)]
+        title = ""
+        authors = ""
+        emails = ""
+        sections: List[PaperSection] = []
+        references: List[str] = []
+
+        current_heading: Optional[str] = None
+        current_lines: List[str] = []
+        metadata_buffer: List[str] = []
+
+        for entry in segment_list:
+            text = str(entry.get("text", "")).strip()
+            if not text:
+                continue
+            text_level = entry.get("text_level")
+            if isinstance(text_level, int) and text_level <= 2:
+                if not title:
+                    title = text
+                    continue
+                if current_heading:
+                    section_text = "\n".join(current_lines).strip()
+                    if section_text:
+                        if "reference" in current_heading.lower():
+                            references = _extract_references(section_text)
+                        else:
+                            sections.append(PaperSection(current_heading, section_text))
+                current_heading = text
+                current_lines = []
+                continue
+
+            if current_heading:
+                current_lines.append(text)
+            else:
+                metadata_buffer.append(text)
+
+        if current_heading:
+            section_text = "\n".join(current_lines).strip()
+            if section_text:
+                if "reference" in current_heading.lower():
+                    references = _extract_references(section_text)
+                else:
+                    sections.append(PaperSection(current_heading, section_text))
+
+        if metadata_buffer:
+            authors = metadata_buffer[0]
+            if len(metadata_buffer) > 1:
+                emails = metadata_buffer[1]
+
+        if not sections and segment_list:
+            combined_text = "\n".join(
+                str(entry.get("text", "")) for entry in segment_list
+            ).strip()
+            if combined_text:
+                sections = [PaperSection("Content", combined_text)]
+
+        return cls(title=title, authors=authors, emails=emails, sections=sections, references=references)
+
+    @classmethod
+    def from_mineru(
+        cls, payload: Any, markdown: Optional[str] = None
+    ) -> "PaperDocument":
+        if isinstance(payload, dict) and "sections" in payload:
+            return cls.from_json(payload)
+        if markdown:
+            try:
+                return cls.from_markdown(markdown)
+            except Exception as exc:  # pragma: no cover - defensive
+                LOGGER.warning("Failed to parse MinerU markdown: %s", exc)
+        if isinstance(payload, list):
+            return cls.from_segments(payload)
+        if isinstance(payload, dict):
+            return cls.from_segments(payload.values())
+        LOGGER.warning("Unsupported MinerU payload type: %s", type(payload))
+        return cls()
 
     def to_dict(self) -> Dict[str, Any]:
         return {
