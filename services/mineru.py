@@ -6,7 +6,7 @@ import tempfile
 import time
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence
 
 import requests
 
@@ -151,14 +151,14 @@ class MineruClient:
         enable_formula: bool = False,
         enable_table: bool = True,
         language: str = "en",
+        extra_formats: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
         if not self.api_key:
             raise MineruError("MinerU API key is required for PDF parsing.")
-        payload = {
+        payload: Dict[str, Any] = {
             "enable_formula": enable_formula,
             "enable_table": enable_table,
             "language": language,
-            "extra_formats": ["markdown"],
             "files": [
                 {
                     "name": file_path.name,
@@ -166,6 +166,11 @@ class MineruClient:
                 }
             ],
         }
+        # According to MinerU documentation, markdown and json artefacts are included by default.
+        # Only pass the "extra_formats" field if explicitly requested in order to avoid
+        # triggering validation errors on deployments that do not recognise it.
+        if extra_formats:
+            payload["extra_formats"] = list(extra_formats)
         response = requests.post(
             self.base_url + self.BATCH_UPLOAD_ENDPOINT,
             headers=self._headers(),
