@@ -104,7 +104,7 @@ class MineruClient:
 
     @staticmethod
     def extract_assets_from_zip(
-        self, zip_path: Path, output_dir: Optional[Path] = None
+        zip_path: Path, output_dir: Optional[Path] = None
     ) -> Dict[str, Any]:
         if output_dir is None:
             output_dir = zip_path.parent
