@@ -22,9 +22,6 @@ innovation of academic papers following the methodology proposed in
 
 ## Getting Started
 
-Install dependencies (a minimal environment is shown below, adjust as
-needed for your preferred model providers):
-
 ```bash
 pip install -r requirements.txt  # create one if necessary
 ```
@@ -58,3 +55,12 @@ plus the final innovation rating.
 
 - Optimizing predefined Q&A prompts for papers across different domains within the HSPIM framework. (Currently using best predefine prompt)
 
+## Bib
+```
+@article{tan2025hierarchical,
+  title={A Hierarchical Framework for Measuring Scientific Paper Innovation via Large Language Models},
+  author={Tan, Hongming and Zhan, Shaoxiong and Jia, Fengwei and Zheng, Hai-Tao and Chan, Wai Kin},
+  journal={arXiv preprint arXiv:2504.14620},
+  year={2025}
+}
+```
