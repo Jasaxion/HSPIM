@@ -56,6 +56,23 @@ def _validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     provider = model_cfg.get("provider")
     if provider not in ("OPENAI", "TRANSFORMERS"):
         raise ConfigError("Unsupported model provider: %s" % provider)
+    if provider == "TRANSFORMERS":
+        local_path = model_cfg.get("local_path") or model_cfg.get("name")
+        if not local_path:
+            raise ConfigError("Local provider requires a model path or identifier.")
+        engine = (model_cfg.get("engine") or "transformers").lower()
+        if engine not in {"transformers", "vllm"}:
+            raise ConfigError("Unsupported local inference engine: %s" % engine)
+        tensor_parallel = model_cfg.get("tensor_parallel_size", 1)
+        if not isinstance(tensor_parallel, int) or tensor_parallel < 1:
+            raise ConfigError("'tensor_parallel_size' must be a positive integer.")
+        gpu_util = model_cfg.get("gpu_memory_utilization", 0.9)
+        try:
+            gpu_util_value = float(gpu_util)
+        except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+            raise ConfigError("'gpu_memory_utilization' must be a number between 0 and 1.") from exc
+        if not 0.0 < gpu_util_value <= 1.0:
+            raise ConfigError("'gpu_memory_utilization' must be within (0, 1].")
     max_workers = config.get("general", {}).get("max_workers", 1)
     if not isinstance(max_workers, int) or max_workers < 1:
         raise ConfigError("'max_workers' must be a positive integer.")

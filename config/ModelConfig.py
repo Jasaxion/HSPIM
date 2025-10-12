@@ -19,6 +19,13 @@ CONFIG: Dict[str, Any] = {
         "name": "gpt-4o-mini",
         "api_key": "",
         "base_url": "https://api.openai.com/v1",
+        "local_path": "",
+        "engine": "transformers",
+        "tensor_parallel_size": 1,
+        "dtype": "auto",
+        "trust_remote_code": True,
+        "gpu_memory_utilization": 0.9,
+        "chat_template": "",
         "temperature": 0.2,
         "max_tokens": 2048,
         "request_timeout": 120,
@@ -47,8 +54,16 @@ CONFIG: Dict[str, Any] = {
             "fields": ["api_key", "base_url", "name"]
         },
         "TRANSFORMERS": {
-            "description": "Local HuggingFace transformers models.",
-            "fields": ["name"]
+            "description": "Local HuggingFace or vLLM-hosted models.",
+            "fields": [
+                "local_path",
+                "engine",
+                "tensor_parallel_size",
+                "dtype",
+                "trust_remote_code",
+                "gpu_memory_utilization",
+                "chat_template"
+            ]
         }
     },
     "ui": {

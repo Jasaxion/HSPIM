@@ -145,6 +145,13 @@ def _config_form_defaults(config: Dict[str, Any]) -> Dict[str, Any]:
         "model_name": model_cfg.get("name", ""),
         "model_api_key": model_cfg.get("api_key", ""),
         "model_base_url": model_cfg.get("base_url", ""),
+        "model_local_path": model_cfg.get("local_path", ""),
+        "model_engine": (model_cfg.get("engine") or "transformers").lower(),
+        "model_tensor_parallel": _as_int(model_cfg.get("tensor_parallel_size", 1)),
+        "model_dtype": model_cfg.get("dtype", "auto"),
+        "model_trust_remote_code": bool(model_cfg.get("trust_remote_code", True)),
+        "model_gpu_utilization": _as_float(model_cfg.get("gpu_memory_utilization", 0.9)),
+        "model_chat_template": model_cfg.get("chat_template", ""),
         "model_temperature": _as_float(model_cfg.get("temperature", 0.0)),
         "model_max_tokens": _as_int(model_cfg.get("max_tokens", 0)),
         "model_request_timeout": _as_int(model_cfg.get("request_timeout", 60)),
@@ -177,6 +184,17 @@ def _build_config_payload(base_config: Dict[str, Any], values: Dict[str, Any]) -
         "name": values["model_name"],
         "api_key": values["model_api_key"],
         "base_url": values["model_base_url"],
+        "local_path": values["model_local_path"],
+        "engine": (values["model_engine"] or "transformers").lower(),
+        "tensor_parallel_size": _as_int(
+            values["model_tensor_parallel"], base_model.get("tensor_parallel_size", 1)
+        ),
+        "dtype": values["model_dtype"],
+        "trust_remote_code": bool(values["model_trust_remote_code"]),
+        "gpu_memory_utilization": _as_float(
+            values["model_gpu_utilization"], base_model.get("gpu_memory_utilization", 0.9)
+        ),
+        "chat_template": values["model_chat_template"],
         "temperature": _as_float(values["model_temperature"], base_model.get("temperature", 0.0)),
         "max_tokens": _as_int(values["model_max_tokens"], base_model.get("max_tokens", 0)),
         "request_timeout": _as_int(values["model_request_timeout"], base_model.get("request_timeout", 60)),
@@ -307,15 +325,60 @@ def build_app() -> gr.Blocks:
                         value=form_defaults["model_name"],
                         label=translate("model_name", default_language),
                     )
-                    model_api_key = gr.Textbox(
-                        value=form_defaults["model_api_key"],
-                        label=translate("model_api_key", default_language),
-                        type="password",
-                    )
-                    model_base_url = gr.Textbox(
-                        value=form_defaults["model_base_url"],
-                        label=translate("model_base_url", default_language),
-                    )
+
+                    with gr.Group(visible=form_defaults["model_provider"].upper() == "OPENAI") as openai_group:
+                        model_api_key = gr.Textbox(
+                            value=form_defaults["model_api_key"],
+                            label=translate("model_api_key", default_language),
+                            type="password",
+                        )
+                        model_base_url = gr.Textbox(
+                            value=form_defaults["model_base_url"],
+                            label=translate("model_base_url", default_language),
+                        )
+                        model_request_timeout = gr.Number(
+                            value=form_defaults["model_request_timeout"],
+                            label=translate("model_request_timeout", default_language),
+                            precision=0,
+                        )
+
+                    with gr.Group(visible=form_defaults["model_provider"].upper() == "TRANSFORMERS") as local_group:
+                        model_local_path = gr.Textbox(
+                            value=form_defaults["model_local_path"],
+                            label=translate("model_local_path", default_language),
+                            placeholder="/path/to/model-or-hub-id",
+                        )
+                        model_engine = gr.Dropdown(
+                            choices=["transformers", "vllm"],
+                            value=(form_defaults["model_engine"] or "transformers").lower(),
+                            label=translate("model_engine", default_language),
+                        )
+                        model_tensor_parallel = gr.Number(
+                            value=form_defaults["model_tensor_parallel"],
+                            label=translate("model_tensor_parallel", default_language),
+                            precision=0,
+                        )
+                        model_dtype = gr.Textbox(
+                            value=form_defaults["model_dtype"],
+                            label=translate("model_dtype", default_language),
+                        )
+                        model_trust_remote_code = gr.Checkbox(
+                            value=form_defaults["model_trust_remote_code"],
+                            label=translate("model_trust_remote_code", default_language),
+                        )
+                        model_gpu_utilization = gr.Slider(
+                            minimum=0.1,
+                            maximum=1.0,
+                            step=0.05,
+                            value=form_defaults["model_gpu_utilization"],
+                            label=translate("model_gpu_utilization", default_language),
+                        )
+                        model_chat_template = gr.Textbox(
+                            value=form_defaults["model_chat_template"],
+                            label=translate("model_chat_template", default_language),
+                            lines=4,
+                        )
+
                     model_temperature = gr.Slider(
                         minimum=0.0,
                         maximum=2.0,
@@ -326,11 +389,6 @@ def build_app() -> gr.Blocks:
                     model_max_tokens = gr.Number(
                         value=form_defaults["model_max_tokens"],
                         label=translate("model_max_tokens", default_language),
-                        precision=0,
-                    )
-                    model_request_timeout = gr.Number(
-                        value=form_defaults["model_request_timeout"],
-                        label=translate("model_request_timeout", default_language),
                         precision=0,
                     )
                     model_extra = gr.Textbox(
@@ -430,6 +488,13 @@ def build_app() -> gr.Blocks:
                     model_name_value,
                     model_api_key_value,
                     model_base_url_value,
+                    model_local_path_value,
+                    model_engine_value,
+                    model_tensor_parallel_value,
+                    model_dtype_value,
+                    model_trust_remote_code_value,
+                    model_gpu_utilization_value,
+                    model_chat_template_value,
                     model_temperature_value,
                     model_max_tokens_value,
                     model_request_timeout_value,
@@ -460,6 +525,13 @@ def build_app() -> gr.Blocks:
                                 "model_name": model_name_value,
                                 "model_api_key": model_api_key_value,
                                 "model_base_url": model_base_url_value,
+                                "model_local_path": model_local_path_value,
+                                "model_engine": model_engine_value,
+                                "model_tensor_parallel": model_tensor_parallel_value,
+                                "model_dtype": model_dtype_value,
+                                "model_trust_remote_code": model_trust_remote_code_value,
+                                "model_gpu_utilization": model_gpu_utilization_value,
+                                "model_chat_template": model_chat_template_value,
                                 "model_temperature": model_temperature_value,
                                 "model_max_tokens": model_max_tokens_value,
                                 "model_request_timeout": model_request_timeout_value,
@@ -490,11 +562,19 @@ def build_app() -> gr.Blocks:
                 def on_reload(language_value):
                     lang_code = language_value if language_value in LANGUAGE_CODES else default_language
                     latest = _config_form_defaults(load_config())
+                    provider = (latest["model_provider"] or "").upper()
                     return (
                         gr.update(value=latest["model_provider"]),
                         gr.update(value=latest["model_name"]),
                         gr.update(value=latest["model_api_key"]),
                         gr.update(value=latest["model_base_url"]),
+                        gr.update(value=latest["model_local_path"]),
+                        gr.update(value=(latest["model_engine"] or "transformers").lower()),
+                        gr.update(value=latest["model_tensor_parallel"]),
+                        gr.update(value=latest["model_dtype"]),
+                        gr.update(value=latest["model_trust_remote_code"]),
+                        gr.update(value=latest["model_gpu_utilization"]),
+                        gr.update(value=latest["model_chat_template"]),
                         gr.update(value=latest["model_temperature"]),
                         gr.update(value=latest["model_max_tokens"]),
                         gr.update(value=latest["model_request_timeout"]),
@@ -515,7 +595,16 @@ def build_app() -> gr.Blocks:
                         gr.update(value=latest["ui_default_language"]),
                         gr.update(value=latest["ui_theme"]),
                         gr.update(value=latest["ui_enhanced_parsing_default"]),
+                        gr.update(visible=provider == "OPENAI"),
+                        gr.update(visible=provider == "TRANSFORMERS"),
                         gr.update(value=translate("config_reload_success", lang_code)),
+                    )
+
+                def on_provider_change(provider_value):
+                    provider = (provider_value or "").upper()
+                    return (
+                        gr.update(visible=provider == "OPENAI"),
+                        gr.update(visible=provider == "TRANSFORMERS"),
                     )
 
                 save_button.click(
@@ -526,6 +615,13 @@ def build_app() -> gr.Blocks:
                         model_name,
                         model_api_key,
                         model_base_url,
+                        model_local_path,
+                        model_engine,
+                        model_tensor_parallel,
+                        model_dtype,
+                        model_trust_remote_code,
+                        model_gpu_utilization,
+                        model_chat_template,
                         model_temperature,
                         model_max_tokens,
                         model_request_timeout,
@@ -558,6 +654,13 @@ def build_app() -> gr.Blocks:
                         model_name,
                         model_api_key,
                         model_base_url,
+                        model_local_path,
+                        model_engine,
+                        model_tensor_parallel,
+                        model_dtype,
+                        model_trust_remote_code,
+                        model_gpu_utilization,
+                        model_chat_template,
                         model_temperature,
                         model_max_tokens,
                         model_request_timeout,
@@ -578,110 +681,132 @@ def build_app() -> gr.Blocks:
                         ui_default_language,
                         ui_theme,
                         ui_enhanced_parsing_default,
+                        openai_group,
+                        local_group,
                         status_output,
                     ],
                 )
 
-        def on_language_change(selection: str):
-            lang_code = _language_from_label(selection)
-            choices = _language_choices(lang_code)
-            return (
-                lang_code,
-                gr.update(value=f"# {translate('app_title', lang_code)}"),
-                gr.update(
-                    choices=choices,
-                    value=_language_label(lang_code, lang_code),
-                    label=translate("language_label", lang_code),
-                ),
-                gr.update(label=translate("analysis_tab", lang_code)),
-                gr.update(label=translate("config_tab", lang_code)),
-                gr.update(label=translate("upload_label", lang_code)),
-                gr.update(label=translate("enhanced_parsing", lang_code)),
-                gr.update(value=translate("analyze_button", lang_code)),
-                gr.update(label=translate("analysis_summary", lang_code)),
-                gr.update(label=translate("sections_title", lang_code)),
-                gr.update(label=translate("raw_output_title", lang_code)),
-                gr.update(value=translate("config_description", lang_code)),
-                gr.update(label=translate("model_section_title", lang_code)),
-                gr.update(label=translate("model_provider", lang_code)),
-                gr.update(label=translate("model_name", lang_code)),
-                gr.update(label=translate("model_api_key", lang_code)),
-                gr.update(label=translate("model_base_url", lang_code)),
-                gr.update(label=translate("model_temperature", lang_code)),
-                gr.update(label=translate("model_max_tokens", lang_code)),
-                gr.update(label=translate("model_request_timeout", lang_code)),
-                gr.update(label=translate("model_extra", lang_code)),
-                gr.update(label=translate("general_section_title", lang_code)),
-                gr.update(label=translate("general_data_dir", lang_code)),
-                gr.update(label=translate("general_review_dir", lang_code)),
-                gr.update(label=translate("general_output_dir", lang_code)),
-                gr.update(label=translate("general_overwrite", lang_code)),
-                gr.update(label=translate("general_max_workers", lang_code)),
-                gr.update(label=translate("general_retry_limit", lang_code)),
-                gr.update(label=translate("general_enable_logging", lang_code)),
-                gr.update(label=translate("mineru_section_title", lang_code)),
-                gr.update(label=translate("mineru_api_key", lang_code)),
-                gr.update(label=translate("mineru_base_url", lang_code)),
-                gr.update(label=translate("mineru_use_ocr", lang_code)),
-                gr.update(label=translate("mineru_enable_formula", lang_code)),
-                gr.update(label=translate("mineru_enable_table", lang_code)),
-                gr.update(label=translate("mineru_language", lang_code)),
-                gr.update(label=translate("ui_section_title", lang_code)),
-                gr.update(label=translate("ui_default_language", lang_code)),
-                gr.update(label=translate("ui_theme", lang_code)),
-                gr.update(label=translate("ui_enhanced_parsing_default", lang_code)),
-                gr.update(value=translate("config_save", lang_code)),
-                gr.update(value=translate("config_reload", lang_code)),
-                gr.update(value=""),
-            )
+                model_provider.change(
+                    fn=on_provider_change,
+                    inputs=[model_provider],
+                    outputs=[openai_group, local_group],
+                )
 
-        language_dropdown.change(
-            fn=on_language_change,
-            inputs=[language_dropdown],
-            outputs=[
-                language_state,
-                title_md,
-                language_dropdown,
-                analysis_tab,
-                config_tab,
-                file_input,
-                enhanced_toggle,
-                analyze_button,
-                summary_output,
-                sections_output,
-                raw_output,
-                config_intro,
-                model_section,
-                model_provider,
-                model_name,
-                model_api_key,
-                model_base_url,
-                model_temperature,
-                model_max_tokens,
-                model_request_timeout,
-                model_extra,
-                general_section,
-                general_data_dir,
-                general_review_dir,
-                general_output_dir,
-                general_overwrite,
-                general_max_workers,
-                general_retry_limit,
-                general_enable_logging,
-                mineru_section,
-                mineru_api_key,
-                mineru_base_url,
-                mineru_use_ocr,
-                mineru_enable_formula,
-                mineru_enable_table,
-                mineru_language,
-                ui_section,
-                ui_default_language,
-                ui_theme,
-                ui_enhanced_parsing_default,
-                save_button,
-                reload_button,
-                status_output,
+                def on_language_change(selection: str):
+                    lang_code = _language_from_label(selection)
+                    choices = _language_choices(lang_code)
+                    return (
+                        lang_code,
+                        gr.update(value=f"# {translate('app_title', lang_code)}"),
+                        gr.update(
+                            choices=choices,
+                            value=_language_label(lang_code, lang_code),
+                            label=translate("language_label", lang_code),
+                        ),
+                        gr.update(label=translate("analysis_tab", lang_code)),
+                        gr.update(label=translate("config_tab", lang_code)),
+                        gr.update(label=translate("upload_label", lang_code)),
+                        gr.update(label=translate("enhanced_parsing", lang_code)),
+                        gr.update(value=translate("analyze_button", lang_code)),
+                        gr.update(label=translate("analysis_summary", lang_code)),
+                        gr.update(label=translate("sections_title", lang_code)),
+                        gr.update(label=translate("raw_output_title", lang_code)),
+                        gr.update(value=translate("config_description", lang_code)),
+                        gr.update(label=translate("model_section_title", lang_code)),
+                        gr.update(label=translate("model_provider", lang_code)),
+                        gr.update(label=translate("model_name", lang_code)),
+                        gr.update(label=translate("model_api_key", lang_code)),
+                        gr.update(label=translate("model_base_url", lang_code)),
+                        gr.update(label=translate("model_local_path", lang_code)),
+                        gr.update(label=translate("model_engine", lang_code)),
+                        gr.update(label=translate("model_tensor_parallel", lang_code)),
+                        gr.update(label=translate("model_dtype", lang_code)),
+                        gr.update(label=translate("model_trust_remote_code", lang_code)),
+                        gr.update(label=translate("model_gpu_utilization", lang_code)),
+                        gr.update(label=translate("model_chat_template", lang_code)),
+                        gr.update(label=translate("model_temperature", lang_code)),
+                        gr.update(label=translate("model_max_tokens", lang_code)),
+                        gr.update(label=translate("model_request_timeout", lang_code)),
+                        gr.update(label=translate("model_extra", lang_code)),
+                        gr.update(label=translate("general_section_title", lang_code)),
+                        gr.update(label=translate("general_data_dir", lang_code)),
+                        gr.update(label=translate("general_review_dir", lang_code)),
+                        gr.update(label=translate("general_output_dir", lang_code)),
+                        gr.update(label=translate("general_overwrite", lang_code)),
+                        gr.update(label=translate("general_max_workers", lang_code)),
+                        gr.update(label=translate("general_retry_limit", lang_code)),
+                        gr.update(label=translate("general_enable_logging", lang_code)),
+                        gr.update(label=translate("mineru_section_title", lang_code)),
+                        gr.update(label=translate("mineru_api_key", lang_code)),
+                        gr.update(label=translate("mineru_base_url", lang_code)),
+                        gr.update(label=translate("mineru_use_ocr", lang_code)),
+                        gr.update(label=translate("mineru_enable_formula", lang_code)),
+                        gr.update(label=translate("mineru_enable_table", lang_code)),
+                        gr.update(label=translate("mineru_language", lang_code)),
+                        gr.update(label=translate("ui_section_title", lang_code)),
+                        gr.update(label=translate("ui_default_language", lang_code)),
+                        gr.update(label=translate("ui_theme", lang_code)),
+                        gr.update(label=translate("ui_enhanced_parsing_default", lang_code)),
+                        gr.update(value=translate("config_save", lang_code)),
+                        gr.update(value=translate("config_reload", lang_code)),
+                        gr.update(value=""),
+                    )
+
+            language_dropdown.change(
+                fn=on_language_change,
+                inputs=[language_dropdown],
+                outputs=[
+                    language_state,
+                    title_md,
+                    language_dropdown,
+                    analysis_tab,
+                    config_tab,
+                    file_input,
+                    enhanced_toggle,
+                    analyze_button,
+                    summary_output,
+                    sections_output,
+                    raw_output,
+                    config_intro,
+                    model_section,
+                    model_provider,
+                    model_name,
+                    model_api_key,
+                    model_base_url,
+                    model_local_path,
+                    model_engine,
+                    model_tensor_parallel,
+                    model_dtype,
+                    model_trust_remote_code,
+                    model_gpu_utilization,
+                    model_chat_template,
+                    model_temperature,
+                    model_max_tokens,
+                    model_request_timeout,
+                    model_extra,
+                    general_section,
+                    general_data_dir,
+                    general_review_dir,
+                    general_output_dir,
+                    general_overwrite,
+                    general_max_workers,
+                    general_retry_limit,
+                    general_enable_logging,
+                    mineru_section,
+                    mineru_api_key,
+                    mineru_base_url,
+                    mineru_use_ocr,
+                    mineru_enable_formula,
+                    mineru_enable_table,
+                    mineru_language,
+                    ui_section,
+                    ui_default_language,
+                    ui_theme,
+                    ui_enhanced_parsing_default,
+                    save_button,
+                    reload_button,
+                    status_output,
             ],
         )
 
