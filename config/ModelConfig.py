@@ -1,29 +1,59 @@
-from openai import OpenAI
+"""Model configuration for the HSPIM application.
 
-# You need to replace the API_KEY with your own API key and choose the model you want to use
-API_KEY = ""
+This file is auto-generated and will be overwritten when configuration
+settings are updated from the Gradio interface. Avoid manual edits unless
+necessary. All values are stored as standard Python literals to simplify
+parsing and persistence.
+"""
+from __future__ import annotations
 
-MinerU_API = ""
+from typing import Any, Dict
 
-MODEL_CON = {
-    "model_type": "OPENAI",
-    "model_name": "gpt-4o-mini"
+# The CONFIG dictionary stores runtime parameters for external services,
+# model providers, and application level behaviours. The structure is
+# intentionally flat so it can be serialised back into this module without
+# complex templating logic.
+CONFIG: Dict[str, Any] = {
+    "model": {
+        "provider": "OPENAI",
+        "name": "gpt-4o-mini",
+        "api_key": "",
+        "base_url": "https://api.openai.com/v1",
+        "temperature": 0.2,
+        "max_tokens": 2048,
+        "request_timeout": 120,
+        "extra": {}
+    },
+    "general": {
+        "data_dir": "data",
+        "review_dir": "data",
+        "output_dir": "data",
+        "overwrite_existing_files": False,
+        "max_workers": 16,
+        "retry_limit": 3,
+        "enable_logging": True
+    },
+    "mineru": {
+        "api_key": "",
+        "base_url": "https://mineru.net/api/v4",
+        "use_ocr": True,
+        "enable_formula": False,
+        "enable_table": True,
+        "language": "en"
+    },
+    "available_models": {
+        "OPENAI": {
+            "description": "OpenAI compatible APIs including Azure/Deepseek endpoints.",
+            "fields": ["api_key", "base_url", "name"]
+        },
+        "TRANSFORMERS": {
+            "description": "Local HuggingFace transformers models.",
+            "fields": ["name"]
+        }
+    },
+    "ui": {
+        "default_language": "en",
+        "theme": "soft",
+        "enhanced_parsing_default": False
+    }
 }
-
-GENERAL_CON = {
-    "data_dir": "data",
-    "full_paper": False, #Whether process full paper or single section
-    "overwrite_existing_files": False,
-    "max_workers": 16,
-    "retry_limit": 3,
-    "review_dir": "data",
-    "output_dir": "data"
-}
-
-# List of models available
-# Todo: 这里应该支持更多模型，例如开源模型，可使用huggingface或者vllm进行加载
-MODEL_LIST = {
-    "Deepseek": OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com"),
-    "OPENAI": OpenAI(api_key=API_KEY)
-}
-
