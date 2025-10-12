@@ -27,7 +27,7 @@ CONFIG: Dict[str, Any] = {
         "gpu_memory_utilization": 0.9,
         "chat_template": "",
         "temperature": 0.2,
-        "max_tokens": 2048,
+        "max_tokens": 4096,
         "request_timeout": 120,
         "extra": {}
     },
@@ -45,8 +45,8 @@ CONFIG: Dict[str, Any] = {
     "mineru": {
         "api_key": "",
         "base_url": "https://mineru.net/api/v4",
-        "use_ocr": True,
-        "enable_formula": False,
+        "use_ocr": False,
+        "enable_formula": True,
         "enable_table": True,
         "language": "en"
     },
@@ -70,7 +70,7 @@ CONFIG: Dict[str, Any] = {
     },
     "ui": {
         "default_language": "en",
-        "theme": "soft",
+        "theme": "monochrome",
         "enhanced_parsing_default": False
     }
 }
