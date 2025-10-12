@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import pprint
 import sys
 from pathlib import Path
 from typing import Any, Dict
@@ -68,7 +69,7 @@ def save_config(config: Dict[str, Any]) -> None:
     """Persist the configuration back to ModelConfig.py."""
     validated = _validate_config(config)
     _ensure_directories(validated)
-    formatted = json.dumps(validated, indent=4, ensure_ascii=False, sort_keys=True)
+    formatted = pprint.pformat(validated, indent=4, sort_dicts=False)
     content = (
         "\"\"\"Model configuration for the HSPIM application.\n\n"
         "This file is auto-generated and will be overwritten when configuration\n"
