@@ -43,7 +43,7 @@ def load_config() -> Dict[str, Any]:
 
 def _ensure_directories(config: Dict[str, Any]) -> None:
     general = config.get("general", {})
-    for key in ("data_dir", "review_dir", "output_dir"):
+    for key in ("data_dir", "review_dir", "output_dir", "logs_dir"):
         path = general.get(key)
         if path:
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -79,6 +79,13 @@ def _validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     retry_limit = config.get("general", {}).get("retry_limit", 1)
     if not isinstance(retry_limit, int) or retry_limit < 0:
         raise ConfigError("'retry_limit' must be a non-negative integer.")
+    general_cfg = config.get("general", {})
+    debug_mode = general_cfg.get("debug_mode", False)
+    if not isinstance(debug_mode, bool):
+        raise ConfigError("'debug_mode' must be a boolean value.")
+    logs_dir = general_cfg.get("logs_dir", "")
+    if logs_dir and not isinstance(logs_dir, str):
+        raise ConfigError("'logs_dir' must be a string path.")
     return config
 
 

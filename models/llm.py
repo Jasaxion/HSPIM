@@ -62,21 +62,43 @@ class OpenAIChatModel(BaseChatModel):
 
     def _chat_sync(self, messages: List[ChatMessage], options: Dict[str, Any]) -> str:
         payload = [message.__dict__ for message in messages]
+        temperature = options.get("temperature", self.temperature)
+        max_tokens = options.get("max_tokens", self.max_tokens)
+        timeout = options.get("request_timeout", self.request_timeout)
+
+        responses_client = getattr(self.client, "responses", None)
+        if responses_client is not None:
+            try:
+                response = responses_client.create(
+                    model=self.model,
+                    input=payload,
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                    timeout=timeout,
+                )
+                try:
+                    output = response.output[0].content[0].text  # type: ignore[attr-defined]
+                    return str(output)
+                except (AttributeError, IndexError, KeyError) as exc:  # pragma: no cover
+                    LOGGER.debug("Unexpected responses payload, falling back: %s", exc)
+            except Exception as exc:  # pragma: no cover
+                LOGGER.debug("Responses API call failed, falling back to chat completions: %s", exc)
+
         try:
-            response = self.client.responses.create(
+            chat_client = getattr(self.client, "chat", None)
+            completions = getattr(chat_client, "completions", None) if chat_client else None
+            if completions is None:
+                raise AttributeError("chat completions client not available")
+            response = completions.create(
                 model=self.model,
-                input=payload,
-                temperature=options.get("temperature", self.temperature),
-                max_output_tokens=options.get("max_tokens", self.max_tokens),
-                timeout=options.get("request_timeout", self.request_timeout),
+                messages=payload,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
             )
+            return str(response.choices[0].message.content)
         except Exception as exc:  # pragma: no cover
             raise LLMError(f"OpenAI request failed: {exc}") from exc
-        try:
-            output = response.output[0].content[0].text  # type: ignore[attr-defined]
-        except (AttributeError, IndexError, KeyError) as exc:  # pragma: no cover
-            raise LLMError("Unexpected OpenAI response format") from exc
-        return str(output)
 
 
 def _format_prompt(messages: List[ChatMessage], tokenizer: Optional[Any]) -> str:

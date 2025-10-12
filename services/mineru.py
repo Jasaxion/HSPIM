@@ -191,8 +191,16 @@ class MineruClient:
                 if item.get("file_name") == file_name:
                     state = item.get("state")
                     if state == "done":
+                        LOGGER.debug("MinerU batch %s completed", batch_id)
                         return item
                     if state == "failed":
                         raise MineruError(item.get("err_msg", "MinerU batch task failed"))
+                    LOGGER.debug(
+                        "MinerU batch %s in state '%s' (extracted %s/%s)",
+                        batch_id,
+                        state,
+                        item.get("extract_progress", {}).get("extracted_pages"),
+                        item.get("extract_progress", {}).get("total_pages"),
+                    )
             time.sleep(poll_interval)
         raise MineruError("MinerU batch task timed out")

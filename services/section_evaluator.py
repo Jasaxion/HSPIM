@@ -63,8 +63,17 @@ class SectionEvaluator:
         async def process_section(section: PaperSection) -> Dict[str, Any]:
             async with semaphore:
                 matched = await self._classify_section(section)
+                LOGGER.debug(
+                    "Section '%s' classified as '%s'", section.heading, matched
+                )
                 answer = await self._generate_answer(section, matched)
+                LOGGER.debug(
+                    "Generated answer for section '%s' (%d chars)",
+                    section.heading,
+                    len(answer or ""),
+                )
                 scores = await self._score_section(section, matched, answer)
+                LOGGER.debug("Scores for section '%s': %s", section.heading, scores)
                 return {
                     "Section": section.heading,
                     "MatchedSection": matched,
@@ -75,6 +84,10 @@ class SectionEvaluator:
         tasks = [process_section(section) for section in document.sections]
         results = await asyncio.gather(*tasks)
         final_score = calculate_paper_predicted_score(results)
+        LOGGER.info(
+            "Completed evaluation with final score %.2f", final_score
+        )
+        LOGGER.debug("Full evaluation payload: %s", results)
         return {
             "title": document.title,
             "authors": document.authors,

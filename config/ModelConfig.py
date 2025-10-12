@@ -38,7 +38,9 @@ CONFIG: Dict[str, Any] = {
         "overwrite_existing_files": False,
         "max_workers": 16,
         "retry_limit": 3,
-        "enable_logging": True
+        "enable_logging": True,
+        "logs_dir": "logs",
+        "debug_mode": False
     },
     "mineru": {
         "api_key": "",

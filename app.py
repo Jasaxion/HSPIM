@@ -14,6 +14,7 @@ from config.config_manager import ConfigError, load_config, save_config
 from i18n import translate
 from services.pipeline import PipelineError, analyse_paper
 from services.result_formatter import build_section_html, build_summary_markdown
+from utils.logger import configure_logging
 
 LANGUAGE_CODES = ["en", "zh"]
 LANGUAGE_LABELS = {
@@ -159,10 +160,12 @@ def _config_form_defaults(config: Dict[str, Any]) -> Dict[str, Any]:
         "general_data_dir": general_cfg.get("data_dir", ""),
         "general_review_dir": general_cfg.get("review_dir", ""),
         "general_output_dir": general_cfg.get("output_dir", ""),
+        "general_logs_dir": general_cfg.get("logs_dir", ""),
         "general_overwrite": bool(general_cfg.get("overwrite_existing_files", False)),
         "general_max_workers": _as_int(general_cfg.get("max_workers", 1)),
         "general_retry_limit": _as_int(general_cfg.get("retry_limit", 0)),
         "general_enable_logging": bool(general_cfg.get("enable_logging", False)),
+        "general_debug_mode": bool(general_cfg.get("debug_mode", False)),
         "mineru_api_key": mineru_cfg.get("api_key", ""),
         "mineru_base_url": mineru_cfg.get("base_url", ""),
         "mineru_use_ocr": bool(mineru_cfg.get("use_ocr", False)),
@@ -204,10 +207,12 @@ def _build_config_payload(base_config: Dict[str, Any], values: Dict[str, Any]) -
         "data_dir": values["general_data_dir"],
         "review_dir": values["general_review_dir"],
         "output_dir": values["general_output_dir"],
+        "logs_dir": values["general_logs_dir"] or base_general.get("logs_dir", "logs"),
         "overwrite_existing_files": bool(values["general_overwrite"]),
         "max_workers": _as_int(values["general_max_workers"], base_general.get("max_workers", 1)),
         "retry_limit": _as_int(values["general_retry_limit"], base_general.get("retry_limit", 0)),
         "enable_logging": bool(values["general_enable_logging"]),
+        "debug_mode": bool(values["general_debug_mode"]),
     }
     payload["mineru"] = {
         "api_key": values["mineru_api_key"],
@@ -252,6 +257,7 @@ async def _run_analysis(file_obj, use_enhanced: bool, language: str) -> Tuple[st
 
 def build_app() -> gr.Blocks:
     config = load_config()
+    configure_logging(config.get("general", {}))
     ui_config = config.get("ui", {})
     default_language = ui_config.get("default_language", LANGUAGE_CODES[0])
     if default_language not in LANGUAGE_CODES:
@@ -410,6 +416,10 @@ def build_app() -> gr.Blocks:
                         value=form_defaults["general_output_dir"],
                         label=translate("general_output_dir", default_language),
                     )
+                    general_logs_dir = gr.Textbox(
+                        value=form_defaults["general_logs_dir"],
+                        label=translate("general_logs_dir", default_language),
+                    )
                     general_overwrite = gr.Checkbox(
                         value=form_defaults["general_overwrite"],
                         label=translate("general_overwrite", default_language),
@@ -427,6 +437,10 @@ def build_app() -> gr.Blocks:
                     general_enable_logging = gr.Checkbox(
                         value=form_defaults["general_enable_logging"],
                         label=translate("general_enable_logging", default_language),
+                    )
+                    general_debug_mode = gr.Checkbox(
+                        value=form_defaults["general_debug_mode"],
+                        label=translate("general_debug_mode", default_language),
                     )
 
                 with gr.Accordion(translate("mineru_section_title", default_language), open=False) as mineru_section:
@@ -502,10 +516,12 @@ def build_app() -> gr.Blocks:
                     general_data_dir_value,
                     general_review_dir_value,
                     general_output_dir_value,
+                    general_logs_dir_value,
                     general_overwrite_value,
                     general_max_workers_value,
                     general_retry_limit_value,
                     general_enable_logging_value,
+                    general_debug_mode_value,
                     mineru_api_key_value,
                     mineru_base_url_value,
                     mineru_use_ocr_value,
@@ -539,10 +555,12 @@ def build_app() -> gr.Blocks:
                                 "general_data_dir": general_data_dir_value,
                                 "general_review_dir": general_review_dir_value,
                                 "general_output_dir": general_output_dir_value,
+                                "general_logs_dir": general_logs_dir_value,
                                 "general_overwrite": general_overwrite_value,
                                 "general_max_workers": general_max_workers_value,
                                 "general_retry_limit": general_retry_limit_value,
                                 "general_enable_logging": general_enable_logging_value,
+                                "general_debug_mode": general_debug_mode_value,
                                 "mineru_api_key": mineru_api_key_value,
                                 "mineru_base_url": mineru_base_url_value,
                                 "mineru_use_ocr": mineru_use_ocr_value,
@@ -582,10 +600,12 @@ def build_app() -> gr.Blocks:
                         gr.update(value=latest["general_data_dir"]),
                         gr.update(value=latest["general_review_dir"]),
                         gr.update(value=latest["general_output_dir"]),
+                        gr.update(value=latest["general_logs_dir"]),
                         gr.update(value=latest["general_overwrite"]),
                         gr.update(value=latest["general_max_workers"]),
                         gr.update(value=latest["general_retry_limit"]),
                         gr.update(value=latest["general_enable_logging"]),
+                        gr.update(value=latest["general_debug_mode"]),
                         gr.update(value=latest["mineru_api_key"]),
                         gr.update(value=latest["mineru_base_url"]),
                         gr.update(value=latest["mineru_use_ocr"]),
@@ -629,10 +649,12 @@ def build_app() -> gr.Blocks:
                         general_data_dir,
                         general_review_dir,
                         general_output_dir,
+                        general_logs_dir,
                         general_overwrite,
                         general_max_workers,
                         general_retry_limit,
                         general_enable_logging,
+                        general_debug_mode,
                         mineru_api_key,
                         mineru_base_url,
                         mineru_use_ocr,
@@ -668,10 +690,12 @@ def build_app() -> gr.Blocks:
                         general_data_dir,
                         general_review_dir,
                         general_output_dir,
+                        general_logs_dir,
                         general_overwrite,
                         general_max_workers,
                         general_retry_limit,
                         general_enable_logging,
+                        general_debug_mode,
                         mineru_api_key,
                         mineru_base_url,
                         mineru_use_ocr,
@@ -733,10 +757,12 @@ def build_app() -> gr.Blocks:
                         gr.update(label=translate("general_data_dir", lang_code)),
                         gr.update(label=translate("general_review_dir", lang_code)),
                         gr.update(label=translate("general_output_dir", lang_code)),
+                        gr.update(label=translate("general_logs_dir", lang_code)),
                         gr.update(label=translate("general_overwrite", lang_code)),
                         gr.update(label=translate("general_max_workers", lang_code)),
                         gr.update(label=translate("general_retry_limit", lang_code)),
                         gr.update(label=translate("general_enable_logging", lang_code)),
+                        gr.update(label=translate("general_debug_mode", lang_code)),
                         gr.update(label=translate("mineru_section_title", lang_code)),
                         gr.update(label=translate("mineru_api_key", lang_code)),
                         gr.update(label=translate("mineru_base_url", lang_code)),
@@ -789,10 +815,12 @@ def build_app() -> gr.Blocks:
                     general_data_dir,
                     general_review_dir,
                     general_output_dir,
+                    general_logs_dir,
                     general_overwrite,
                     general_max_workers,
                     general_retry_limit,
                     general_enable_logging,
+                    general_debug_mode,
                     mineru_section,
                     mineru_api_key,
                     mineru_base_url,

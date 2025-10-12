@@ -76,6 +76,12 @@ def build_summary_markdown(result: Dict[str, Any], language: str) -> str:
                 translate("emails_label", language), result["emails"]
             )
         )
+    if result.get("log_dir"):
+        meta.append(
+            "**{}:** `{}`".format(
+                translate("logs_path_label", language), result["log_dir"]
+            )
+        )
     if meta:
         lines.append("\n".join(meta))
     return "\n\n".join(lines)
