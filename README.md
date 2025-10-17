@@ -9,6 +9,8 @@ A Hierarchical Framework for Measuring Scientific Paper Innovation via Large Lan
 
 ## Overview
 
+![Screenshot](./docs/GUI-en.png)
+
 This repository hosts a Gradio powered application that analyses the
 innovation of academic papers following the methodology proposed in
 [HSPIM](https://arxiv.org/abs/2504.14620). The workflow comprises:
