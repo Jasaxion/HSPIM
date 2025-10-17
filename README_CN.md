@@ -8,6 +8,8 @@ A Hierarchical Framework for Measuring Scientific Paper Innovation via Large Lan
 
 ## 概述
 
+![界面截图](./docs/GUI-zh.png)
+
 本项目提供了一个基于 Gradio 的应用，用于按照论文  
 [HSPIM](https://arxiv.org/abs/2504.14620) 中提出的方法，对学术论文的创新性进行分析与评估。  
 整体工作流程包括：
